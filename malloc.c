@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 typedef struct metadata {
   int magic1;
@@ -45,7 +46,7 @@ metadata_t *get_free_block(metadata_t **last, size_t size){
 metadata_t *get_space(metadata_t* last, size_t size) {
   metadata_t *block;
   block = sbrk(0);
-  void *request = sbrk(size + METADATA_SIZE);
+  void *request = sbrk((int)(size + METADATA_SIZE));
   if ((void*)block != request) {
     printf(SEGFAULT);
     exit(-1);

@@ -9,8 +9,7 @@
 #ifndef __Malloc__malloc__
 #define __Malloc__malloc__
 
-#include <stdio.h>
-#include <unistd.h>
+#include <inttypes.h>
 
 void *malloc(size_t size);
 
