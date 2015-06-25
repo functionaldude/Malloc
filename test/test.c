@@ -1,9 +1,16 @@
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
+//
+//  test.c
+//  Malloc
+//
+//  Created by Zoltán Sasvári on 25.06.15.
+//  Copyright (c) 2015 BinaryTrasher. All rights reserved.
+//
 
-int main(int argc, char** argv){
+#include <stdio.h>
+#include <assert.h>
+#include "../malloc.h"
+
+int main(){
   printf("Malloc test: \n");
   int* data[6];
   data[0] = (int*)malloc(5*sizeof(int));
