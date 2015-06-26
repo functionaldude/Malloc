@@ -1,4 +1,4 @@
-CFLAGS  = -w -std=gnu99 -lpthread
+CFLAGS  = -w -std=gnu99 -pthread
 
 all: libmalloc.a
 
