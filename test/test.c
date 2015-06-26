@@ -8,10 +8,12 @@
 
 #include <stdio.h>
 #include <assert.h>
+#include <pthread.h>
 #include "../malloc.h"
 
-int main(){
-  printf("Malloc test: \n");
+pthread_mutex_t out_lock;
+
+void * test(){
   int* data[6];
   data[0] = (int*)malloc(5*sizeof(int));
   data[1] = (int*)malloc(20*sizeof(int));
@@ -46,7 +48,9 @@ int main(){
   free(data[2]);
   free(data[4]);
   free(data[5]);
+  pthread_mutex_lock(&out_lock);
   printf("Passed malloc-free!\n");
+  pthread_mutex_unlock(&out_lock);
 
 
   data[0] = (int*)calloc(5,sizeof(int));
@@ -76,7 +80,9 @@ int main(){
   free(data[2]);
   free(data[4]);
   free(data[5]);
+  pthread_mutex_lock(&out_lock);
   printf("Passed calloc-free!\n");
+  pthread_mutex_unlock(&out_lock);
 
   data[2] = (int*)calloc(40,sizeof(int));
   for(i = 0;i<40;i++){
@@ -90,7 +96,29 @@ int main(){
     assert(data[2][i] == 0x99999999);
   }
   free(data[2]);
+  pthread_mutex_lock(&out_lock);
   printf("Passed realloc-free!\n");
+  pthread_mutex_unlock(&out_lock);
+
+  return NULL;
+}
+
+#define THREAD_NUM 5
+int main(){
+  pthread_mutex_init(&out_lock, NULL);
+  printf("Malloc test: \n");
+  printf("Single threaded:\n");
+  test();
+
+  printf("Multi threaded:\n");
+  pthread_t thread[THREAD_NUM];
+  for (int i = 0; i<THREAD_NUM; ++i) {
+    pthread_create(&thread[i], NULL, test, NULL);
+  }
+  for (int i = 0; i<THREAD_NUM; ++i) {
+    pthread_join(thread[i], NULL);
+  }
+
 
   printf("All tests passed!\n");
   return 0;
