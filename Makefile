@@ -1,5 +1,4 @@
-CC = /usr/bin/gcc
-CFLAGS  = -w -std=gnu99
+CFLAGS  = -w -std=gnu99 -lpthread
 
 all: libmalloc.a
 
