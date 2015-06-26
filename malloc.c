@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <stdlib.h>
 
 typedef struct metadata {
@@ -23,6 +24,7 @@ typedef struct metadata {
 
 void *base = 0;
 int alloc_count = 0;
+pthread_mutex_t list_lock;
 
 #define METADATA_SIZE sizeof(struct metadata)
 #define MAGIC_FREE 0xDEADDA7A
@@ -76,17 +78,23 @@ void *malloc(size_t size) {
     return 0;
   }
   if (!base) { // first
+    pthread_mutex_init(&list_lock, NULL);
+    pthread_mutex_lock(&list_lock);
     block = get_space(0, size);
     if (!block) {
+      pthread_mutex_unlock(&list_lock);
       return 0;
     }
     base = block;
+//    pthread_mutex_unlock(&list_lock);
   } else {
+    pthread_mutex_lock(&list_lock);
     metadata_t *last = base;
     block = get_free_block(&last, size);
     if (!block) {
       block = get_space(last, size);
       if (!block) {
+        pthread_mutex_unlock(&list_lock);
         return 0;
       }
     } else {
@@ -97,6 +105,7 @@ void *malloc(size_t size) {
     }
   }
   alloc_count++;
+  pthread_mutex_unlock(&list_lock);
   return (block+1);
 }
 
@@ -104,7 +113,7 @@ metadata_t *get_block(void *ptr){
   metadata_t* ret_val =  ((metadata_t*)ptr)-1;
   if ((ret_val->magic1 != MAGIC_USED && ret_val->magic1 != MAGIC_FREE) || ret_val->magic1 != ret_val->magic2)
   {
-    printf("Segmentation fault\n");
+    printf(SEGFAULT);
     exit(-1);
   }
   return ret_val;
@@ -121,6 +130,7 @@ void free(void *ptr) {
   if (!ptr) {
     return;
   }
+  pthread_mutex_lock(&list_lock);
   metadata_t* block_ptr = get_block(ptr);
   merge_block(block_ptr);
 
@@ -141,17 +151,21 @@ void free(void *ptr) {
     block_ptr->magic1 = MAGIC_FREE;
     block_ptr->magic2 = MAGIC_FREE;
   }
+  pthread_mutex_unlock(&list_lock);
 }
 
 void *realloc(void *ptr, size_t size) {
   if (!ptr) {
     return malloc(size);
   }
+  pthread_mutex_lock(&list_lock);
   metadata_t *block_ptr = get_block(ptr);
   if (block_ptr->size >= size) {
+    pthread_mutex_unlock(&list_lock);
     return ptr;
   }
   void *new_ptr;
+  pthread_mutex_unlock(&list_lock);
   new_ptr = malloc(size);
   if (!new_ptr) {
     return 0;
