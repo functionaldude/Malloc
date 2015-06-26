@@ -1,5 +1,5 @@
 CC = /usr/bin/gcc
-CFLAGS  = -w
+CFLAGS  = -w -std=gnu99
 
 all: libmalloc.a
 
