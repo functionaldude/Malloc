@@ -13,6 +13,14 @@
 #include <pthread.h>
 #include <stdlib.h>
 
+#ifdef __GNUC__
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+#else
+#define likely(x)       (x)
+#define unlikely(x)     (x)
+#endif
+
 typedef struct metadata {
   int magic1;
   size_t size;
@@ -37,7 +45,7 @@ metadata_t *get_free_block(metadata_t **last, size_t size){
     *last = current;
     current = current->next;
     if (!current) continue;
-    if ((current->magic1 != MAGIC_USED && current->magic1 != MAGIC_FREE) || current->magic1 != current->magic2) {
+    if (unlikely((current->magic1 != MAGIC_USED && current->magic1 != MAGIC_FREE) || current->magic1 != current->magic2)) {
       printf(SEGFAULT);
       exit(-1);
     }
@@ -49,11 +57,11 @@ metadata_t *get_space(metadata_t* last, size_t size) {
   metadata_t *block;
   block = sbrk(0);
   void *request = sbrk((int)(size + METADATA_SIZE));
-  if ((void*)block != request) {
+  if (unlikely((void*)block != request)) {
     printf(SEGFAULT);
     exit(-1);
   }
-  if (request == (void*) -1) {
+  if (unlikely(request == (void*) -1)) {
     return 0; // shit
   }
 
@@ -74,14 +82,14 @@ metadata_t *get_space(metadata_t* last, size_t size) {
 void *malloc(size_t size) {
   metadata_t *block;
   // TODO: align size?
-  if (size <= 0) {
+  if (unlikely(size <= 0)) {
     return 0;
   }
-  if (!base) { // first
+  if (unlikely(!base)) { // first
     pthread_mutex_init(&list_lock, NULL);
     pthread_mutex_lock(&list_lock);
     block = get_space(0, size);
-    if (!block) {
+    if (unlikely(!block)) {
       pthread_mutex_unlock(&list_lock);
       return 0;
     }
@@ -93,7 +101,7 @@ void *malloc(size_t size) {
     block = get_free_block(&last, size);
     if (!block) {
       block = get_space(last, size);
-      if (!block) {
+      if (unlikely(!block)) {
         pthread_mutex_unlock(&list_lock);
         return 0;
       }
@@ -111,7 +119,7 @@ void *malloc(size_t size) {
 
 metadata_t *get_block(void *ptr){
   metadata_t* ret_val =  ((metadata_t*)ptr)-1;
-  if ((ret_val->magic1 != MAGIC_USED && ret_val->magic1 != MAGIC_FREE) || ret_val->magic1 != ret_val->magic2)
+  if (unlikely((ret_val->magic1 != MAGIC_USED && ret_val->magic1 != MAGIC_FREE) || ret_val->magic1 != ret_val->magic2))
   {
     printf(SEGFAULT);
     exit(-1);
@@ -127,23 +135,22 @@ void merge_block(metadata_t*block){
 }
 
 void free(void *ptr) {
-  if (!ptr) {
+  if (unlikely(!ptr)) {
     return;
   }
   pthread_mutex_lock(&list_lock);
   metadata_t* block_ptr = get_block(ptr);
   merge_block(block_ptr);
 
-  if (block_ptr->free != 0 || block_ptr->magic1 != MAGIC_USED || block_ptr->magic1 != block_ptr->magic2) {
+  if (unlikely(block_ptr->free != 0 || block_ptr->magic1 != MAGIC_USED || block_ptr->magic1 != block_ptr->magic2)) {
     printf(SEGFAULT);
     exit(-1);
   }
   alloc_count--;
-  if (alloc_count == 0){
+  if (unlikely(alloc_count == 0)){
     brk(base);
     base = 0;
   } else if (block_ptr->next == NULL){
-    //printf("free\n");
     block_ptr->prev->next = NULL;
     brk(block_ptr);
   } else {
@@ -155,7 +162,7 @@ void free(void *ptr) {
 }
 
 void *realloc(void *ptr, size_t size) {
-  if (!ptr) {
+  if (unlikely(!ptr)) {
     return malloc(size);
   }
   pthread_mutex_lock(&list_lock);
@@ -167,7 +174,7 @@ void *realloc(void *ptr, size_t size) {
   void *new_ptr;
   pthread_mutex_unlock(&list_lock);
   new_ptr = malloc(size);
-  if (!new_ptr) {
+  if (unlikely(!new_ptr)) {
     return 0;
   }
   memcpy(new_ptr, ptr, block_ptr->size);
@@ -176,11 +183,13 @@ void *realloc(void *ptr, size_t size) {
 }
 
 void *calloc(size_t nelem, size_t elsize) {
-  if (nelem == 0 || elsize == 0) {
+  if (unlikely(nelem == 0 || elsize == 0)) {
     return 0;
   }
   void *ptr = malloc(nelem*elsize);
+  if (unlikely(!ptr)) {
+    return 0;
+  }
   memset(ptr, 0, nelem*elsize);
-  alloc_count++;
   return ptr;
 }
