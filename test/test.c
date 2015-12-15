@@ -9,12 +9,17 @@
 #include <stdio.h>
 #include <assert.h>
 #include <pthread.h>
+#include <stdbool.h>
+#include <unistd.h>
 #include "../malloc.h"
 
 pthread_mutex_t out_lock;
+size_t pr_brk;
+bool multithreaded;
 
 void * test(){
   int* data[6];
+  if (!multithreaded) pr_brk = (size_t)sbrk(0);
   data[0] = (int*)malloc(5*sizeof(int));
   data[1] = (int*)malloc(20*sizeof(int));
   data[2] = (int*)malloc(40*sizeof(int));
@@ -49,6 +54,11 @@ void * test(){
   free(data[4]);
   free(data[5]);
   pthread_mutex_lock(&out_lock);
+  if (!multithreaded) {
+    size_t current = (size_t)sbrk(0);
+    assert(pr_brk == current);
+    pr_brk = current;
+  }
   printf("Passed malloc-free!\n");
   pthread_mutex_unlock(&out_lock);
 
@@ -82,6 +92,11 @@ void * test(){
   free(data[5]);
   pthread_mutex_lock(&out_lock);
   printf("Passed calloc-free!\n");
+  if (!multithreaded) {
+    size_t current = (size_t)sbrk(0);
+    assert(pr_brk == current);
+    pr_brk = current;
+  }
   pthread_mutex_unlock(&out_lock);
 
   data[2] = (int*)calloc(40,sizeof(int));
@@ -98,6 +113,11 @@ void * test(){
   free(data[2]);
   pthread_mutex_lock(&out_lock);
   printf("Passed realloc-free!\n");
+  if (!multithreaded) {
+    size_t current = (size_t)sbrk(0);
+    assert(pr_brk == current);
+    pr_brk = current;
+  }
   pthread_mutex_unlock(&out_lock);
 
   return NULL;
@@ -108,9 +128,11 @@ int main(){
   pthread_mutex_init(&out_lock, NULL);
   printf("Malloc test: \n");
   printf("Single threaded:\n");
+  multithreaded = false;
   test();
 
   printf("Multi threaded:\n");
+  multithreaded = true;
   pthread_t thread[THREAD_NUM];
   for (int i = 0; i<THREAD_NUM; ++i) {
     pthread_create(&thread[i], NULL, test, NULL);
